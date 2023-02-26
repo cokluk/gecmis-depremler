@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Kandilli Rasathanesi - İnteraktif Geçmiş Depremler Haritası </title>
+		<script src="https://maps.googleapis.com/maps/api/js" async defer></script>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+		<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet-src.js" ></script>
+		<script src="https://unpkg.com/leaflet.gridlayer.googlemutant@latest/dist/Leaflet.GoogleMutant.js"></script>
+		<style>
+			#map {
+				position: absolute;
+				left: 0;
+				right: 0;
+				height: 100vh;
+			}
+			body {
+				margin: 0;
+			}
+
+			.leaflet-tooltip.my-labels {
+				background-color: transparent;
+				border: transparent;
+				box-shadow: none;
+				font-weight: bold;
+				font-size: 2vh;
+			}
+
+			path {
+				stroke: red!important;
+			}
+
+
+			.kk {
+				position: absolute;
+				bottom: .4%;
+				left: 5vw;
+				z-index: 1000;
+				color: white;
+				text-shadow: 0px 0px 20px black;
+				font-family: 'Roboto';
+				font-style: italic;
+			}
+
+			.modal {
+				display: none;
+			    position: absolute;
+				bottom: 3.4%;
+				left: 1vw;
+				z-index: 1000;
+				background: white;
+				width: auto;
+				height: auto;
+				border-radius: 12px;
+				box-shadow: 0px 0px 7px black;
+				padding: 1vh;
+			}
+
+ 
+		</style>
+	</head>
+	<body>
+		<div id="map" class="map"></div>
+		<a class="kk" href="#">Kullanılan kaynaklar</a>
+		<div class="modal">
+			Harita: leafletjs  <a target="_blank" href="https://leafletjs.com/">https://leafletjs.com/</a><br>
+			Harita sağlayıcı eklentisi: L.GridLayer.GoogleMutant <a target="_blank"  href="https://gitlab.com/IvanSanchez/Leaflet.GridLayer.GoogleMutant">https://gitlab.com/IvanSanchez/Leaflet.GridLayer.GoogleMutant</a><br>
+			Deprem verileri: <a target="_blank"  href="http://www.koeri.boun.edu.tr/">http://www.koeri.boun.edu.tr/</a><br>
+			İşaretleyici silme yöntemi:  <a target="_blank"  href="https://stackoverflow.com/a/15290796">https://stackoverflow.com/a/15290796</a><br>
+			İşaretleyici etiket, simge ekleme: <a target="_blank"  href="https://stackoverflow.com/questions/34775308/leaflet-how-to-add-a-text-label-to-a-custom-marker-icon">https://stackoverflow.com/questions/34775308/leaflet-how-to-add-a-text-label-to-a-custom-marker-icon</a><br>
+			Dünya tektonik plakaları ve sınırları (Faylar): <a target="_blank"  href="https://github.com/fraxen/tectonicplates">https://github.com/fraxen/tectonicplates</a><br>
+			Fayların uygulanması : <a target="_blank"  href="https://github.com/rmoesw01/leaflet-challenge">https://github.com/rmoesw01/leaflet-challenge</a><br>
+			<br>
+				BOĞAZİÇİ ÜNİVERSİTESİ'nin kullandığı sunuculara yük olmamak adına orjinal alan adı maskelenerek gizlenmiş ve ara proxy sunucuları ile oluşabilecek kötü amaçlı saldırılar bu sayede minimuma indirilmiştir. <br>
+				IP adresi maskeleme için kullanılan waf, SSL: <a target="_blank" href="https://waf.ni.net.tr/">https://waf.ni.net.tr/</a><br>
+				Proxy ve uluslararası kullanılan CDN servisi: <a target="_blank" href="https://www.cloudflare.com/">https://www.cloudflare.com/</a>
+			<br>
+
+			Yapımcı: <a target="_blank"  href="https://www.linkedin.com/in/ali-salih-%C3%A7okluk-06472b1a4/">Linkedin</a> <br><br>
+			<a class="close" href="#">&times; kapat</a>
+		</div>
+		<script src="https://code.jquery.com/jquery-3.6.3.min.js" ></script>
+		<script type="text/javascript" src="faylar.js"></script>
+		<script type="text/javascript">
+
+			$(document).on("click", ".kk", function () {
+				$(".modal").show();
+			});
+			$(document).on("click", ".close", function () {
+				$(".modal").hide();
+			});
+
+			var mapopts = {
+				zoomSnap: 0.25,
+			};
+			var markers = new Array();
+			var map = L.map("map", mapopts).setView([60, 0], 1);
+			var faultLines = L.layerGroup();
+			L.geoJSON(faylar.features, { fillOpacity: 0 }).addTo(faultLines);
+			map.flyTo([36.74, 35.94], 10);
+
+			map.on('moveend', function(e) {
+				const { lat, lng } = e.target.getCenter();
+				// https://deprem-ara-sunucusu.cokluk.com/survey/pasteqlistwithlocation?minmag=4&lat=36.74053487772361&lon=35.93971252441407&distance=100
+				$.get(`https://deprem-ara-sunucusu.cokluk.com/survey/pasteqlistwithlocation?minmag=4&lat=${lat}&lon=${lng}&distance=100`, {}, function (data, textStatus, jqXHR) {
+					markerDelAgain();
+					$.each(data, function (i, v) { 
+					 
+						color = "yellow"
+
+						v.mag = parseFloat(v.mag)
+
+						if(v.mag < 4.9) {
+							color = "yellow"
+						}
+
+						if(v.mag > 4.9 && v.mag < 5.9) {
+							color = "orange"
+						}
+
+						if(v.mag > 6.0) {
+							color = "red"
+						}
+
+						var stepIcon = L.icon({
+							iconUrl: color + '.png', 
+							iconSize: [40, 40],  
+						});
+						var marker = new L.marker([v.lat, v.lon], { icon:stepIcon , tarih: v.tarih, lat: v.lat, lon: v.lon, mag: v.mag}).bindPopup(`
+						Tarih:${v.tarih}<br><br>
+						Büyüklük: ${v.mag}
+						`);
+						marker.bindTooltip(`${v.mag}`, {
+													permanent: true,
+													direction: 'center',
+													className: "my-labels"
+												});
+						marker.addTo(map);
+						
+ 
+						markers.push(marker);
+
+
+					});	
+				
+				});
+ 			});
+			
+			function markerDelAgain() {
+				for(i=0;i<markers.length;i++) {
+					map.removeLayer(markers[i]);
+			    }  
+			}
+			var hybridMutant = L.gridLayer.googleMutant({ maxZoom: 24, type: "hybrid", }).addTo(map);
+			var grid = L.gridLayer();
+			grid.createTile = function (coords) {
+				var tile = L.DomUtil.create("div", "tile-coords");
+				tile.style.border = "1px solid black";
+				tile.style.lineHeight = "256px";
+				tile.style.textAlign = "center";
+				tile.style.fontSize = "20px";
+				tile.innerHTML = [coords.x, coords.y, coords.z].join(", ");
+				return tile;
+			};
+			L.control.layers({ }, { "Kordinat Izgarası": grid,  "Fay Hatları": faultLines}, { collapsed: false, } ).addTo(map);
+		</script>
+	</body>
+</html>
